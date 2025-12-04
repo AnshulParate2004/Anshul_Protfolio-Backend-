@@ -15,12 +15,8 @@ from config import settings
 from agent import AnshulChatAgent
 from profile_data import ANSHUL_PROFILE
 
-# Validate settings on startup (but don't crash immediately)
-try:
-    settings.validate()
-except ValueError as e:
-    print(f"⚠️ Configuration Error: {e}")
-    print("⚠️ App will start but API calls will fail until GOOGLE_API_KEY is set")
+# Don't validate on module import - let it fail gracefully on first request
+# This prevents crashes during Vercel cold starts
 
 # Initialize FastAPI app
 app = FastAPI(

@@ -24,9 +24,9 @@ class Settings:
     
     # Google Gemini Settings
     GOOGLE_API_KEY: str = os.getenv("GOOGLE_API_KEY", "")
-    GEMINI_MODEL: str = "gemini-2.5-pro"  # Fastest model
+    GEMINI_MODEL: str = "gemini-2.0-flash-exp"  # Fastest model
     GEMINI_TEMPERATURE: float = 0.7
-    GEMINI_MAX_OUTPUT_TOKENS: int = 200048  # Reduced for faster responses
+    GEMINI_MAX_OUTPUT_TOKENS: int = 2048  # Reduced for faster responses
     
     # Memory Settings
     MAX_CONVERSATION_HISTORY: int = 10  # Keep only last 10 messages
@@ -36,14 +36,18 @@ class Settings:
     SESSION_TIMEOUT_MINUTES: int = 30
     
     def validate(self):
-        """Validate required settings"""
+        """Validate required settings - returns True if valid, raises ValueError if not"""
         if not self.GOOGLE_API_KEY:
             raise ValueError(
-                "GOOGLE_API_KEY is not set. "
-                "Please add it to your .env file. "
+                "❌ GOOGLE_API_KEY is not set in environment variables. "
+                "Please add it in Vercel Dashboard: Settings > Environment Variables. "
                 "Get your key from: https://makersuite.google.com/app/apikey"
             )
         return True
+    
+    def is_configured(self) -> bool:
+        """Check if API key is configured without raising exception"""
+        return bool(self.GOOGLE_API_KEY)
 
 # Create settings instance
 settings = Settings()

@@ -16,6 +16,13 @@ class AnshulChatAgent:
     """
     
     def __init__(self):
+        # Validate API key before configuring
+        if not settings.is_configured():
+            raise ValueError(
+                "GOOGLE_API_KEY is not configured. "
+                "Add it to Vercel environment variables: Settings > Environment Variables"
+            )
+        
         # Configure Gemini
         genai.configure(api_key=settings.GOOGLE_API_KEY)
         
