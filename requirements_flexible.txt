@@ -1,0 +1,15 @@
+# Core FastAPI
+fastapi==0.115.5
+uvicorn[standard]==0.32.1
+python-dotenv==1.0.1
+pydantic==2.10.3
+
+# LangChain ecosystem - latest compatible versions
+langchain>=0.3.13
+langchain-core>=0.3.26
+langchain-google-genai>=2.0.8
+langchain-community>=0.3.13
+langgraph>=0.2.45
+
+# Google Gemini
+google-generativeai>=0.8.3
