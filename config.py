@@ -24,9 +24,9 @@ class Settings:
     
     # Google Gemini Settings
     GOOGLE_API_KEY: str = os.getenv("GOOGLE_API_KEY", "")
-    GEMINI_MODEL: str = "gemini-2.0-flash-exp"  # Fastest model
+    GEMINI_MODEL: str = "gemini-2.5-pro"  # Fastest model
     GEMINI_TEMPERATURE: float = 0.7
-    GEMINI_MAX_OUTPUT_TOKENS: int = 2048  # Reduced for faster responses
+    GEMINI_MAX_OUTPUT_TOKENS: int = 200048  # Reduced for faster responses
     
     # Memory Settings
     MAX_CONVERSATION_HISTORY: int = 10  # Keep only last 10 messages

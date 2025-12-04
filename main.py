@@ -15,8 +15,12 @@ from config import settings
 from agent import AnshulChatAgent
 from profile_data import ANSHUL_PROFILE
 
-# Validate settings on startup
-settings.validate()
+# Validate settings on startup (but don't crash immediately)
+try:
+    settings.validate()
+except ValueError as e:
+    print(f"⚠️ Configuration Error: {e}")
+    print("⚠️ App will start but API calls will fail until GOOGLE_API_KEY is set")
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -98,10 +102,14 @@ async def startup_event():
     print(f"🤖 Model: {settings.GEMINI_MODEL}")
     print(f"💾 Memory: Last {settings.MAX_CONVERSATION_HISTORY} messages per session")
     print(f"⚡ Minimal dependencies for Vercel")
-    print(f"✅ Ready to chat about Anshul Parate!")
     
-    # Pre-initialize agent
-    get_agent()
+    # Pre-initialize agent (with error handling)
+    try:
+        get_agent()
+        print(f"✅ Ready to chat about Anshul Parate!")
+    except Exception as e:
+        print(f"⚠️ Agent initialization warning: {e}")
+        print("⚠️ Check that GOOGLE_API_KEY is set in Vercel environment variables")
 
 @app.get("/")
 async def root():
