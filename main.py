@@ -1,14 +1,13 @@
 """
 FastAPI Backend for Anshul Parate Portfolio Chatbot
-Optimized for fast responses with LangGraph and limited memory (10 conversations)
+Minimal dependencies version for Vercel deployment
+No LangChain/LangGraph - uses Google Generative AI SDK directly
 """
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict
-import uvicorn
 from datetime import datetime, timedelta
-import asyncio
 from functools import lru_cache
 
 # Import settings and agent
@@ -23,7 +22,7 @@ settings.validate()
 app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
-    description="Fast AI-powered portfolio assistant for Anshul Parate with LangGraph and 10-message memory"
+    description="Lightweight AI-powered portfolio assistant for Anshul Parate"
 )
 
 # CORS middleware
@@ -96,11 +95,9 @@ def cleanup_expired_sessions():
 async def startup_event():
     """Initialize agent on startup"""
     print(f"🚀 Starting {settings.APP_NAME} v{settings.APP_VERSION}")
-    print(f"📍 Server: http://{settings.API_HOST}:{settings.API_PORT}")
-    print(f"📚 Docs: http://localhost:{settings.API_PORT}/docs")
-    print(f"🤖 Model: {settings.GEMINI_MODEL} (Fast Mode)")
+    print(f"🤖 Model: {settings.GEMINI_MODEL}")
     print(f"💾 Memory: Last {settings.MAX_CONVERSATION_HISTORY} messages per session")
-    print(f"⚡ Optimized for speed with LangGraph")
+    print(f"⚡ Minimal dependencies for Vercel")
     print(f"✅ Ready to chat about Anshul Parate!")
     
     # Pre-initialize agent
@@ -121,8 +118,8 @@ async def root():
         "features": [
             "Fast responses with Gemini Flash",
             "10-message conversation memory",
-            "LangGraph-powered agent",
-            "Pydantic-validated data",
+            "Direct Google Generative AI integration",
+            "Minimal dependencies for Vercel",
             "Quick info endpoints"
         ],
         "endpoints": {
@@ -155,7 +152,7 @@ async def chat(request: ChatRequest):
     
     Optimized for quick responses using:
     - Gemini Flash model
-    - Cached agent initialization
+    - Direct Google Generative AI SDK
     - Efficient message trimming
     - Context pre-fetching for relevant queries
     """
@@ -166,20 +163,23 @@ async def chat(request: ChatRequest):
         # Get agent (cached)
         agent = get_agent()
         
-        # Process message with context-aware fast lookup
+        # Process message
         response, updated_messages = agent.chat(
             request.message,
             session_data.messages
         )
         
-        # Update session with trimmed messages (last 10 only)
-        session_data.messages = updated_messages[-(settings.MAX_CONVERSATION_HISTORY + 1):]
+        # Update session with trimmed messages
+        session_data.messages = updated_messages
         session_data.update_activity()
+        
+        # Count messages (exclude system message)
+        message_count = len([m for m in session_data.messages if m.get("role") != "system"])
         
         return ChatResponse(
             response=response,
             success=True,
-            message_count=len(session_data.messages) - 1  # Exclude system message
+            message_count=message_count
         )
     
     except ValueError as e:
@@ -252,7 +252,7 @@ async def list_sessions():
     session_list = [
         SessionInfo(
             session_id=sid,
-            message_count=len(data.messages) - 1,  # Exclude system message
+            message_count=len([m for m in data.messages if m.get("role") != "system"]),
             last_activity=data.last_activity
         )
         for sid, data in sessions.items()
@@ -277,10 +277,5 @@ async def cleanup_sessions():
         "active": after_count
     }
 
-if __name__ == "__main__":
-    uvicorn.run(
-        app,
-        host=settings.API_HOST,
-        port=settings.API_PORT,
-        reload=True
-    )
+# Vercel serverless function handler
+handler = app

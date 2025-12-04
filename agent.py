@@ -1,73 +1,34 @@
 """
-LangGraph Agent for Anshul's Portfolio Chatbot
-Fast, memory-efficient conversational agent with 10-message history limit
+Simplified Chat Agent using Google Generative AI directly
+No LangChain/LangGraph dependencies for Vercel deployment
 """
-from typing import TypedDict, Annotated, Sequence
-from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, SystemMessage
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langgraph.graph import StateGraph, END
-from langgraph.graph.message import add_messages
+import google.generativeai as genai
+from typing import List, Dict, Optional
 from config import settings
 from profile_data import ANSHUL_PROFILE, SYSTEM_PROMPT
-import json
 
-# Define the state structure
-class AgentState(TypedDict):
-    messages: Annotated[Sequence[BaseMessage], add_messages]
-    
 class AnshulChatAgent:
     """
-    LangGraph-based chat agent with:
+    Lightweight chat agent using Google Generative AI SDK directly
     - Fast response times using Gemini Flash
     - Memory limited to last 10 conversations
-    - Pydantic-validated profile data
-    - Optimized for quick lookups
+    - No heavy dependencies
     """
     
     def __init__(self):
-        # Initialize fast Gemini model
-        self.llm = ChatGoogleGenerativeAI(
-            model=settings.GEMINI_MODEL,
-            google_api_key=settings.GOOGLE_API_KEY,
-            temperature=settings.GEMINI_TEMPERATURE,
-            max_output_tokens=settings.GEMINI_MAX_OUTPUT_TOKENS,
+        # Configure Gemini
+        genai.configure(api_key=settings.GOOGLE_API_KEY)
+        
+        # Initialize model with generation config
+        self.generation_config = {
+            "temperature": settings.GEMINI_TEMPERATURE,
+            "max_output_tokens": settings.GEMINI_MAX_OUTPUT_TOKENS,
+        }
+        
+        self.model = genai.GenerativeModel(
+            model_name=settings.GEMINI_MODEL,
+            generation_config=self.generation_config,
         )
-        
-        # Build the graph
-        self.graph = self._build_graph()
-        self.app = self.graph.compile()
-        
-    def _build_graph(self) -> StateGraph:
-        """Build the LangGraph workflow"""
-        workflow = StateGraph(AgentState)
-        
-        # Add nodes
-        workflow.add_node("agent", self._agent_node)
-        
-        # Set entry point
-        workflow.set_entry_point("agent")
-        
-        # Add edge to END
-        workflow.add_edge("agent", END)
-        
-        return workflow
-    
-    def _agent_node(self, state: AgentState) -> dict:
-        """
-        Main agent node that processes messages
-        Maintains only last 10 messages for efficiency
-        """
-        messages = state["messages"]
-        
-        # Trim to last 10 messages (excluding system message)
-        if len(messages) > settings.MAX_CONVERSATION_HISTORY + 1:
-            # Keep system message + last 10 messages
-            messages = [messages[0]] + messages[-(settings.MAX_CONVERSATION_HISTORY):]
-        
-        # Invoke LLM
-        response = self.llm.invoke(messages)
-        
-        return {"messages": [response]}
     
     def get_profile_context(self, query: str) -> str:
         """
@@ -128,7 +89,27 @@ Contact Information:
         
         return ""
     
-    def chat(self, message: str, session_messages: list = None) -> str:
+    def format_history(self, messages: List[Dict]) -> List[Dict]:
+        """
+        Convert message history to Gemini format
+        Format: [{"role": "user", "parts": ["text"]}, {"role": "model", "parts": ["text"]}]
+        """
+        formatted = []
+        for msg in messages:
+            role = msg.get("role")
+            content = msg.get("content", "")
+            
+            if role == "system":
+                # Skip system messages, they're added to the first user message
+                continue
+            elif role == "user":
+                formatted.append({"role": "user", "parts": [content]})
+            elif role == "assistant" or role == "model":
+                formatted.append({"role": "model", "parts": [content]})
+        
+        return formatted
+    
+    def chat(self, message: str, session_messages: Optional[List[Dict]] = None) -> tuple[str, List[Dict]]:
         """
         Process a chat message with fast response
         
@@ -137,16 +118,16 @@ Contact Information:
             session_messages: Previous messages in session (auto-trimmed to 10)
         
         Returns:
-            AI response string
+            Tuple of (AI response string, updated messages list)
         """
-        # Initialize messages with system prompt
+        # Initialize messages
         if session_messages is None or len(session_messages) == 0:
-            messages = [SystemMessage(content=SYSTEM_PROMPT)]
+            messages = [{"role": "system", "content": SYSTEM_PROMPT}]
         else:
-            messages = session_messages
+            messages = session_messages.copy()
             # Ensure system message is first
-            if not isinstance(messages[0], SystemMessage):
-                messages.insert(0, SystemMessage(content=SYSTEM_PROMPT))
+            if not messages or messages[0].get("role") != "system":
+                messages.insert(0, {"role": "system", "content": SYSTEM_PROMPT})
         
         # Add context if relevant
         context = self.get_profile_context(message)
@@ -155,27 +136,38 @@ Contact Information:
         else:
             enhanced_message = message
         
-        # Add user message
-        messages.append(HumanMessage(content=enhanced_message))
-        
         # Trim to maintain memory limit (system + last 10 messages)
         if len(messages) > settings.MAX_CONVERSATION_HISTORY + 1:
-            messages = [messages[0]] + messages[-(settings.MAX_CONVERSATION_HISTORY):]
+            system_msg = messages[0]
+            messages = [system_msg] + messages[-(settings.MAX_CONVERSATION_HISTORY):]
         
-        # Run through graph
-        result = self.app.invoke({"messages": messages})
+        # Format history for Gemini
+        history = self.format_history(messages[1:])  # Exclude system message from history
         
-        # Extract response
-        response = result["messages"][-1].content
+        # Start chat with system prompt and history
+        chat = self.model.start_chat(history=history)
         
-        return response, messages + [AIMessage(content=response)]
+        # Send message with system context
+        full_prompt = f"{SYSTEM_PROMPT}\n\nUser: {enhanced_message}"
+        response = chat.send_message(full_prompt)
+        
+        # Add new messages to history
+        messages.append({"role": "user", "content": message})
+        messages.append({"role": "assistant", "content": response.text})
+        
+        # Trim again after adding new messages
+        if len(messages) > settings.MAX_CONVERSATION_HISTORY + 1:
+            system_msg = messages[0]
+            messages = [system_msg] + messages[-(settings.MAX_CONVERSATION_HISTORY):]
+        
+        return response.text, messages
     
-    def get_quick_info(self, info_type: str) -> dict:
+    def get_quick_info(self, info_type: str) -> Optional[Dict]:
         """
         Get specific information quickly without LLM
         
         Args:
-            info_type: One of ['contact', 'projects', 'skills', 'education', 'experience', 'achievements']
+            info_type: One of ['contact', 'projects', 'skills', 'education', 'experience', 'achievements', 'summary']
         
         Returns:
             Dictionary with requested information
@@ -190,4 +182,4 @@ Contact Information:
             "summary": ANSHUL_PROFILE.summary
         }
         
-        return info_map.get(info_type, {})
+        return info_map.get(info_type)

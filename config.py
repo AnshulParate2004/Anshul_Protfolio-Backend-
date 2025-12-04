@@ -1,5 +1,6 @@
 """
-Configuration settings for the Insight Weaver API
+Configuration settings for the Portfolio API
+Minimal version for Vercel deployment
 """
 import os
 from dotenv import load_dotenv
@@ -9,7 +10,7 @@ load_dotenv()
 class Settings:
     # API Settings
     APP_NAME: str = "Anshul Parate AI Portfolio Assistant"
-    APP_VERSION: str = "2.0.0"
+    APP_VERSION: str = "3.0.0-minimal"
     API_HOST: str = "0.0.0.0"
     API_PORT: int = 8000
     
@@ -23,24 +24,16 @@ class Settings:
     
     # Google Gemini Settings
     GOOGLE_API_KEY: str = os.getenv("GOOGLE_API_KEY", "")
-    GEMINI_MODEL: str = "gemini-2.5-pro"  # Faster model for quick responses
+    GEMINI_MODEL: str = "gemini-2.0-flash-exp"  # Fastest model
     GEMINI_TEMPERATURE: float = 0.7
-    GEMINI_MAX_OUTPUT_TOKENS: int = 100000024  # Reduced for faster responses
+    GEMINI_MAX_OUTPUT_TOKENS: int = 2048  # Reduced for faster responses
     
     # Memory Settings
     MAX_CONVERSATION_HISTORY: int = 10  # Keep only last 10 messages
-    MEMORY_WINDOW_SIZE: int = 10  # Rolling window of conversations
-    
-    # LangChain Settings
-    LANGCHAIN_VERBOSE: bool = False  # Disabled for production speed
     
     # Session Settings
     DEFAULT_SESSION_ID: str = "default"
     SESSION_TIMEOUT_MINUTES: int = 30
-    
-    # Performance Settings
-    ENABLE_CACHING: bool = True
-    CACHE_TTL_SECONDS: int = 300  # 5 minutes
     
     def validate(self):
         """Validate required settings"""
